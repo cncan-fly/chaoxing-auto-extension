@@ -3,13 +3,13 @@
 **当前版本：1.0.18（"1.0 超星修正版"）**
 
 ## 一、安装（开发者模式加载，约 30 秒）
-
-1. 打开 Edge，地址栏输入 `edge://extensions/` 回车。
-2. 打开左下角的 **开发人员模式**（Developer mode）。
-3. 点击 **加载解压缩的扩展**（Load unpacked）。
-4. 选择本文件夹：`chaoxing-auto-extension`
+1. 解压release中的压缩包
+2. 打开 Edge，地址栏输入 `edge://extensions/` 回车。
+3. 打开左下角的 **开发人员模式**（Developer mode）。
+4. 点击 **加载解压缩的扩展**（Load unpacked）。
+5. 选择本文件夹：`chaoxing-auto-extension`
    （里面必须能直接看到 `manifest.json`，不要再往里套一层目录）。
-5. 工具栏出现蓝色播放按钮图标即安装成功。建议点击地址栏右侧的扩展图标 →
+6. 工具栏出现蓝色播放按钮图标即安装成功。建议点击地址栏右侧的扩展图标 →
    把本扩展 **固定到工具栏**，方便随时开关。
 
 > Chrome 同理：`chrome://extensions/` → 开发者模式 → 加载已解压的扩展程序。
