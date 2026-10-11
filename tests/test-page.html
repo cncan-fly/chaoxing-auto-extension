@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>NoPause 本地验证页 — 超星暂停机制仿真</title>
+<style>
+  body { margin: 0; padding: 22px; background: #0f1420; color: #e6ebf5;
+         font: 14px/1.6 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .sub { color: #8e9bb3; font-size: 12.5px; margin-bottom: 16px; }
+  .wrap { max-width: 860px; }
+  .stage { position: relative; border-radius: 10px; overflow: hidden; background: #000;
+           box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  video { display: block; width: 100%; height: 340px; object-fit: cover; }
+  .hud { position: absolute; left: 10px; top: 10px; background: rgba(8,12,20,.78);
+         border: 1px solid #2a3550; border-radius: 8px;
+         padding: 8px 11px; font: 12px/1.65 Consolas, monospace; pointer-events: none; }
+  .hud b { color: #7fd1ff; font-weight: 600; }
+  .paused { color: #ff6b6b; font-weight: 700; }
+  .playing { color: #4ade80; font-weight: 700; }
+  .panel { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .card { background: #161d2c; border: 1px solid #263149; border-radius: 9px; padding: 11px 13px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; color: #b9c6dc; }
+  .card p { margin: 0; color: #8e9bb3; font-size: 12px; }
+  .log { margin-top: 14px; background: #11202a; border: 1px solid #1d3a4a; border-radius: 9px;
+         padding: 10px 12px; height: 190px; overflow: auto;
+         font: 12px/1.6 Consolas, monospace; color: #9fe8c8; white-space: pre-wrap; }
+  .log .bad { color: #ff8a8a; }
+  .log .good { color: #7fe3a3; }
+  .log .info { color: #9fb6d8; }
+  button { background: #23304a; color: #dce6f7; border: 1px solid #33415e; border-radius: 7px;
+           padding: 6px 12px; margin-right: 7px; font: inherit; cursor: pointer; }
+  button:hover { background: #2c3c5c; }
+  ol { color: #9fb0c9; font-size: 13px; }
+  code { background: #1b2433; padding: 1px 5px; border-radius: 4px; color: #ffd479; }
+  .inj-status { margin-bottom: 12px; padding: 9px 12px; border-radius: 8px;
+                font-size: 13px; font-weight: 600; background: #2a1f1f; color: #ff8a8a;
+                border: 1px solid #5c3030; }
+  .inj-status.good { background: #12301f; color: #7fe3a3; border-color: #1d5c3a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="injStatus" class="inj-status">扩展主世界脚本：检测中…</div>
+  <h1>NoPause 本地验证页</h1>
+  <div class="sub">
+    这个页面复刻了超星（学习通）播放器暂停视频的两套机制：
+    <b>① 捕获阶段监听 mouseout / mouseleave / 失焦</b>，<b>② 调用播放器 API <code>window.ananas.pause()</code></b>。
+    视频由 canvas 实时生成，不依赖网络，暂停会立刻表现为画面冻结、进度条停住。
+  </div>
+
+  <div class="stage">
+    <video id="v" playsinline></video>
+    <div class="hud">
+      状态: <span id="st" class="playing">播放中</span><br>
+      document.hidden = <b id="h"></b><br>
+      visibilityState = <b id="vs"></b><br>
+      hasFocus() = <b id="hf"></b><br>
+      被拦截的暂停次数 = <b id="blk">0</b><br>
+      计时: <b id="clock">0.0</b> 秒（画面在动 = 真的在播）
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="card">
+      <h3>当前设置</h3>
+      <p id="cfg">读取中…</p>
+    </div>
+    <div class="card">
+      <h3>怎么验证</h3>
+      <p>① 点播放 → ② 鼠标移出浏览器窗口 → ③ 切到别的标签页 / 最小化 →
+         ④ 回来看看计时是否连续、画面是否一直在动。<br>
+         本页还复刻了"鼠标移出且页面无焦点才暂停"的组合判定，以及右键获得焦点后的对比效果。</p>
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    <button id="btnPlay">播放</button>
+    <button id="btnTrigger">手动触发一次"超星式暂停"</button>
+    <button id="btnClear">清空日志</button>
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <ol>
+    <li>用 <code>edge://extensions/</code> 装好扩展并刷新本页。</li>
+    <li>先点"播放"，此时画面应开始走动、计时开始累加。</li>
+    <li>鼠标移出浏览器窗口、切换标签页、最小化，等 10 秒以上。</li>
+    <li>回到本页：如果计时没有中断、画面一直在动，说明防暂停生效。</li>
+    <li>想对比效果，可以在 <code>edge://extensions/</code> 里临时关掉扩展，刷新本页再来一次。</li>
+  </ol>
+</div>
+
+<script>
+/* =========================================================================
+   1. 用 canvas 生成一路视频流：离线可用，暂停即"冻结"肉眼可见
+   ========================================================================= */
+const video = document.getElementById('v');
+const canvas = document.createElement('canvas');
+canvas.width = 640; canvas.height = 360;
+const ctx = canvas.getContext('2d');
+let frame = 0;
+
+function draw() {
+  frame++;
+  const g = ctx.createLinearGradient(0, 0, 640, 360);
+  g.addColorStop(0, '#12203a');
+  g.addColorStop(1, '#1d3f5e');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 640, 360);
+
+  // 移动的方块：画面一冻结就能立刻看出来
+  const x = (frame * 3) % 640;
+  ctx.fillStyle = '#ffd479';
+  ctx.fillRect(x - 40, 150, 80, 80);
+  ctx.fillStyle = '#4ade80';
+  ctx.beginPath();
+  ctx.arc(640 - x, 90, 26, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 30px "Segoe UI", sans-serif';
+  ctx.fillText('NoPause 测试画面', 24, 54);
+  ctx.font = '22px Consolas, monospace';
+  ctx.fillText('frame ' + frame, 24, 330);
+
+  // 计时器：暂停时不会继续累加
+  ctx.fillStyle = '#9fe8c8';
+  ctx.font = 'bold 26px Consolas, monospace';
+  const played = video.currentTime || 0;
+  ctx.fillText('播放时间 ' + played.toFixed(1) + 's', 300, 330);
+}
+
+const stream = canvas.captureStream(30);
+video.srcObject = stream;
+video.muted = false;   // 故意不静音：顺便验证"后台不被静音"
+video.volume = 0.0;    // canvas 流没有音轨，音量无所谓
+
+let timer = setInterval(() => {
+  if (!video.paused && !video.ended) draw();
+  updateHud();
+}, 33);
+draw();
+
+/* =========================================================================
+   0. 扩展注入状态横幅：一眼看出主世界脚本到底跑起来没有
+   ========================================================================= */
+function refreshInjStatus() {
+  const el = document.getElementById('injStatus');
+  let S = null;
+  try { S = window.__NO_PAUSE_EDU__; } catch (e) {}
+  let domVer = null;
+  try { domVer = document.documentElement.getAttribute('data-nopause-installed'); } catch (e) {}
+  if ((!S || !S.installed) && !domVer) {
+    el.className = 'inj-status';
+    let hint = '请在 edge://extensions/ 点本扩展的"刷新"按钮，然后按 F5 刷新本页。';
+    if (location.protocol === 'file:') {
+      hint = '本页正以 file:// 打开，扩展默认不注入本地文件页面。请运行 node tests/serve.js，' +
+        '然后访问 http://127.0.0.1:8123/ 来验证。';
+    }
+    el.textContent = '❌ 扩展主世界脚本未运行。' + hint;
+    return;
+  }
+  el.className = 'inj-status good';
+  const ver = domVer || (S && S.cfg && S.cfg.version) || '?';
+  el.textContent = '✅ 扩展主世界脚本已运行 v' + ver +
+    '｜组件: ' + ((S && S.installedParts) || []).join('、') +
+    '｜已阻止暂停: ' + ((S && S.blockedPauseCount) || 0) + ' 次';
+}
+setInterval(refreshInjStatus, 800);
+refreshInjStatus();
+
+/* =========================================================================
+   2. 复刻超星的暂停机制（扩展要能拦住这些）
+   ========================================================================= */
+const logEl = document.getElementById('log');
+function log(msg, cls) {
+  const t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = '[' + t + '] ' + msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+  while (logEl.childElementCount > 300) logEl.removeChild(logEl.firstChild);
+}
+
+// —— 机制①：播放器 API（超星把暂停入口封成 window.ananas.pause） ——
+window.ananas = {
+  pause() {
+    log('ananas.pause() 被调用 → 暂停视频', 'bad');
+    video.pause();
+  },
+  play() { video.play().catch(() => {}); }
+};
+
+// —— 机制②：鼠标移出 / 失焦 / 切后台 检测（捕获 + 冒泡两路，逼真一点） ——
+// 同时复刻"鼠标移出 && 页面无焦点 → 暂停"这种组合判定（右键让页面获得焦点后就不再暂停）
+let pauseAttempts = 0;
+function chaoxingPause(reason) {
+  pauseAttempts++;
+  log('检测到「' + reason + '」→ 触发超星式暂停', 'bad');
+  window.ananas.pause();
+}
+function focusGatedPause(reason) {
+  if (document.hasFocus()) {
+    log('检测到「' + reason + '」但页面有焦点（右键效果）→ 不暂停', 'info');
+    return;
+  }
+  chaoxingPause(reason + ' + 无焦点');
+}
+function bindOn(target, label) {
+  ['mouseout', 'mouseleave', 'blur', 'focusout', 'visibilitychange', 'freeze', 'pagehide']
+    .forEach((evt) => {
+      target.addEventListener(evt, () => chaoxingPause(label + ':' + evt), true);
+      target.addEventListener(evt, () => chaoxingPause(label + ':' + evt), false);
+    });
+  // 组合判定：只看鼠标移出 + 焦点
+  target.addEventListener('mouseout', () => focusGatedPause(label + ':mouseout'), false);
+  target.onblur = () => chaoxingPause(label + ':onblur');
+  document.onvisibilitychange = () => chaoxingPause(label + ':onvisibilitychange');
+}
+bindOn(window, 'window');
+bindOn(document, 'document');
+document.body.addEventListener('mouseleave', () => chaoxingPause('body:mouseleave'), true);
+
+/* =========================================================================
+   3. 观察与展示
+   ========================================================================= */
+const st = document.getElementById('st');
+const hEl = document.getElementById('h');
+const vsEl = document.getElementById('vs');
+const hfEl = document.getElementById('hf');
+const blkEl = document.getElementById('blk');
+const clockEl = document.getElementById('clock');
+const cfgEl = document.getElementById('cfg');
+
+// 观察"扩展是否真的挡住了暂停"：看 nativePause 是否被走到
+let lastTime = 0, stalls = 0;
+video.addEventListener('pause', () => {
+  st.textContent = '已暂停 ✗';
+  st.className = 'paused';
+  log('video 触发 pause 事件（如果扩展生效，它应立刻被巡检救回来）', 'bad');
+});
+video.addEventListener('playing', () => {
+  st.textContent = '播放中';
+  st.className = 'playing';
+});
+video.addEventListener('play', () => log('video 开始播放', 'good'));
+
+function updateHud() {
+  hEl.textContent = String(document.hidden);
+  vsEl.textContent = document.visibilityState;
+  hfEl.textContent = String(document.hasFocus());
+  clockEl.textContent = (video.currentTime || 0).toFixed(1);
+  blkEl.textContent = String(window.__NO_PAUSE_EDU__ && window.__NO_PAUSE_EDU__.blockedPauseCount || 0);
+  if (!video.paused) {
+    st.textContent = '播放中';
+    st.className = 'playing';
+  }
+  // 播放时间停滞检测（在后台时也继续跑，回来能看到断层）
+  if (video.currentTime > lastTime + 0.001) lastTime = video.currentTime;
+}
+
+// 读取扩展设置并显示
+function showCfg() {
+  try {
+    chrome.storage.local.get(null, (c) => {
+      if (chrome.runtime.lastError) { cfgEl.textContent = '（读取失败）'; return; }
+      cfgEl.textContent = '开关 enabled=' + c.enabled +
+        ' | 暂停守卫=' + c.guardPause +
+        ' | 拦截鼠标移出=' + c.blockMouseOut +
+        ' | 巡检=' + c.resumePaused;
+    });
+  } catch (e) {
+    cfgEl.textContent = '本页无法访问扩展 API（请用 file:// 或 http:// 打开，并确认扩展已启用）';
+  }
+}
+showCfg();
+setInterval(showCfg, 3000);
+
+document.getElementById('btnPlay').onclick = () => {
+  video.play().catch((e) => log('播放失败: ' + e.message, 'bad'));
+};
+document.getElementById('btnTrigger').onclick = () => {
+  log('—— 手动触发一次完整的"超星式暂停" ——', 'info');
+  window.ananas.pause();
+  window.dispatchEvent(new Event('mouseout'));
+  window.dispatchEvent(new Event('blur'));
+  document.dispatchEvent(new Event('visibilitychange'));
+};
+document.getElementById('btnClear').onclick = () => { logEl.innerHTML = ''; };
+
+log('页面就绪。先点"播放"，然后鼠标移出窗口 / 切换标签页试试。', 'info');
+log('提示：本页会自动记录每次暂停尝试，若画面一直在动说明扩展生效。', 'info');
+</script>
+</body>
+</html>

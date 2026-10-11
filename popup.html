@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>后台网课不断播</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1a2233;
+      --muted: #6b7787;
+      --line: #e6eaf0;
+      --accent: #2f6bff;
+      --ok: #17994f;
+      --off: #98a2b3;
+      --warn: #b54708;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      width: 296px;
+      padding: 14px 14px 10px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 13px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .head { display: flex; align-items: center; gap: 8px; }
+    .head img { width: 22px; height: 22px; flex: none; }
+    .head h1 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: .2px; }
+    .head .ver { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+    .card {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 11px;
+    }
+    .row { display: flex; align-items: center; gap: 10px; }
+    .row + .row { margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--line); }
+    .row .txt { flex: 1; min-width: 0; }
+    .row .t { font-weight: 600; }
+    .row .d { color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+
+    /* 开关 */
+    .switch { position: relative; width: 40px; height: 22px; flex: none; }
+    .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+    .slider {
+      position: absolute; inset: 0; border-radius: 999px; background: #cfd6e0;
+      transition: background .18s ease; pointer-events: none;
+    }
+    .slider::after {
+      content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.25);
+      transition: transform .18s ease;
+    }
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider::after { transform: translateX(18px); }
+    .switch input:focus-visible + .slider { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .status {
+      margin-top: 11px; display: flex; align-items: center; gap: 7px;
+      font-size: 12px; color: var(--muted);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+    .status.off .dot { background: var(--off); }
+    .status.warn .dot { background: var(--warn); }
+    .status.warn { color: var(--warn); }
+
+    details { margin-top: 11px; border-top: 1px solid var(--line); padding-top: 9px; }
+    summary { cursor: pointer; color: var(--muted); font-size: 12px; user-select: none; }
+    summary:hover { color: var(--fg); }
+    .hint { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+    .hint b { color: var(--fg); font-weight: 600; }
+    kbd {
+      font: 11px/1 Consolas, monospace; border: 1px solid var(--line); border-bottom-width: 2px;
+      border-radius: 4px; padding: 1px 4px; background: #f7f9fc; color: var(--fg);
+    }
+    .foot { margin-top: 10px; color: #98a2b3; font-size: 11px; text-align: center; }
+
+    /* 诊断日志区 */
+    #logWrap { margin-top: 11px; border-top: 1px solid var(--line); padding-top: 9px; }
+    .logbox-head {
+      display: flex; align-items: center; gap: 6px;
+      color: var(--muted); font-size: 11.5px;
+    }
+    .logbox-head span { flex: 1; }
+    .logbox-head button {
+      font: 11px/1 "Segoe UI", "Microsoft YaHei", sans-serif;
+      border: 1px solid var(--line); background: #f7f9fc; color: var(--fg);
+      border-radius: 5px; padding: 3px 7px; cursor: pointer;
+    }
+    .logbox-head button:hover { background: #eef2f8; }
+    .logbox {
+      margin-top: 6px; height: 118px; overflow: auto; background: #0f1420;
+      color: #9fe8c8; border-radius: 7px; padding: 7px 8px;
+      font: 11px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-all;
+    }
+    .loghint { margin-top: 6px; color: #98a2b3; font-size: 11px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <img src="icons/icon48.png" alt="" />
+    <h1>后台网课不断播</h1>
+    <span id="ver" class="ver">v1.0.17</span>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="txt">
+        <div class="t">总开关</div>
+        <div class="d">离开页面 / 切标签 / 最小化时，视频继续播放</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enabled" />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div id="status" class="status">
+      <span class="dot"></span>
+      <span id="statusText">正在检测当前页面…</span>
+    </div>
+  </div>
+
+  <details>
+    <summary>高级选项</summary>
+    <div class="card" style="margin-top:8px">
+      <div class="row">
+        <div class="txt">
+          <div class="t">阻止网站自动暂停</div>
+          <div class="d">拦截网页代码里的 video.pause()，你自己点暂停不受影响</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="guardPause" /><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <div class="txt">
+          <div class="t">自动播放并保持 <span style="color:#17994f">默认开启</span></div>
+          <div class="d">发现暂停的视频就自动播起来，<b>全程静音</b>（静音播放不受浏览器自动播放限制）。
+            与「下一节」互不影响——不开下一节也会自动播</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="autoPlay" /><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <div class="txt">
+          <div class="t">拦截鼠标移出检测 <span style="color:#b54708">超星必开</span></div>
+          <div class="d">学习通/超星靠 mouseout 判断鼠标移出播放器就暂停，开启后屏蔽该检测</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="blockMouseOut" /><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <div class="txt">
+          <div class="t">阻止后台静音</div>
+          <div class="d">页面切到后台时，不允许网站把视频静音或音量归零</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="guardMute" /><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <div class="txt">
+          <div class="t">巡检抢救</div>
+          <div class="d">兜底方案：发现视频被暂停就自动续播（最强，个别直播站可关）</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="resumePaused" /><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <div class="txt">
+          <div class="t">下一节 <span style="color:#b54708">有风险</span></div>
+          <div class="d">视频播完自动进入下一节；遇答题页直接点"跳过"不作答。<b>跳过的答题不计分</b>，个别平台可能判定为未完成任务点，请自行权衡</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="autoNext" /><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <div class="txt">
+          <div class="t">隐藏登录提示遮罩</div>
+          <div class="d">部分网站（如 YouTube 嵌入）会弹"请登录"横幅挡住画面</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="forceHideBanner" /><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <div class="txt">
+          <div class="t">调试日志 <span style="color:#2f6bff">排查用</span></div>
+          <div class="d">在页面左下角显示诊断浮层，并把拦截细节（含调用来源）写进下方记录</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="log" /><span class="slider"></span></label>
+      </div>
+    </div>
+  </details>
+
+  <div id="logWrap">
+    <div class="logbox-head">
+      <span>运行记录（最近 <span id="logCount">0</span> 条）</span>
+      <button id="logRefresh">刷新</button>
+      <button id="logClear">清空</button>
+    </div>
+    <div id="logBox" class="logbox">（暂无记录）</div>
+    <div class="loghint">
+      这里始终会显示关键事件：主世界脚本是否运行、注入是否失败、每次被拦截的暂停
+      及调用来源。如果只有"✅ 主世界已运行"而没有别的记录，说明本页没人尝试暂停视频；
+      如果你看到视频停了、这里却没有任何"已阻止"记录，把那行状态和记录一起发我。
+    </div>
+  </div>
+
+  <p class="hint">
+    快捷键 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> 可随时开关。<br />
+    <b>提示：</b>如果某个页面是切换开关之前就已经打开的，请刷新一次让它生效。
+  </p>
+
+  <div class="foot">仅在本地运行，不上传任何数据</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

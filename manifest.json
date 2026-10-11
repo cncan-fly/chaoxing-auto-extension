@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "后台网课不断播（NoPause）",
+  "version": "1.0.18",
+  "version_name": "1.0 超星修正版（1.0.18）",
+  "description": "鼠标离开页面、切换标签页或最小化浏览器时，视频/网课继续保持播放，不被网站自动暂停。",
+  "minimum_chrome_version": "102",
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injected.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "后台网课不断播（点击开关）",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "toggle-nopause": {
+      "suggested_key": {
+        "default": "Alt+Shift+P",
+        "windows": "Alt+Shift+P",
+        "mac": "Alt+Shift+P"
+      },
+      "description": "开启 / 关闭后台不断播"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "exclude_matches": [
+        "https://chromewebstore.google.com/*",
+        "https://microsoftedge.microsoft.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true,
+      "world": "ISOLATED"
+    }
+  ]
+}
