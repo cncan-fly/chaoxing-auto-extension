@@ -71,7 +71,7 @@
 1. 打开 Edge，地址栏输入 `edge://extensions/` 回车。
 2. 打开左下角的 **开发人员模式**（Developer mode）。
 3. 点击 **加载解压缩的扩展**（Load unpacked）。
-4. 选择本文件夹：`edge-nopause-extension`
+4. 选择本文件夹：`chaoxing-auto-extension`
    （里面必须能直接看到 `manifest.json`，不要再往里套一层目录）。
 5. 工具栏出现蓝色播放按钮图标即安装成功。建议点击地址栏右侧的扩展图标 →
    把本扩展 **固定到工具栏**，方便随时开关。
@@ -325,7 +325,7 @@
 ## 八、文件结构
 
 ```
-edge-nopause-extension/
+chaoxing-auto-extension/
 ├── manifest.json      # MV3 清单：权限、web_accessible_resources、内容脚本、快捷键、版本号
 ├── content.js         # 内容脚本（隔离世界）：同步注入主世界脚本、同步设置、中继诊断日志
 ├── injected.js        # 核心：跑在页面主世界，七层防暂停 + 自动下一节 + 诊断浮层
