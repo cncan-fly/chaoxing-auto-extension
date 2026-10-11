@@ -1,6 +1,7 @@
 # 超星网课杀手— Edge / Chrome 扩展
 # 项目背景：为了解决学习通网课需要手动播放以及鼠标移出页面自动停止的问题，所以做了这个插件，这个插件使用deepseek v4.1flash制作，希望可以帮助到广大深受学习通水课伤害的大学生们，希望大家有更多的时间做自己想做的事情。
 **当前版本：1.0.18**
+<img width="1774" height="887" alt="deepseek_whale_girl_github" src="https://github.com/user-attachments/assets/5f36293d-3661-4f08-b713-59083100ed18" />
 
 ## 一、安装（开发者模式加载，约 30 秒）
 1. 解压release中的压缩包
